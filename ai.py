@@ -54,4 +54,15 @@ class Dqn():
         self.memory=ReplayMemory(100000)
         self.optimizer=optim.Adam(self.model.parameters(),lr=0.001)# lr is learning rate,value should be not high
         self.last_state=torch.Tensor(input_size).unsqueeze(0)
+        self.last_action=0
+        self.last_reward=0
         
+    def select_action(self,state):# to select which action to be taken
+        probs=F.softmax(self.model(Variable(state, volatile=True))*7)  #probs stand for finding probablities and softmax function is used to select action based on probablity, state is a torch tensor and we are converting it into torch variable, by using volatile=true we are specifying we dont want gradient along with graphs
+        # 7 is the temperature parameter , it is used to maximize the softmax function
+        action=probs.multinomial() #multinomial is used to randomly select the probablitiy values
+        return action.data[0,0] # it is a trick
+    
+    
+    def learn(self,batch_state,batch_next_state,batch_reward,batch_action):
+        outputa=self.model(batch_state)
