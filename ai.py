@@ -57,12 +57,55 @@ class Dqn():
         self.last_action=0
         self.last_reward=0
         
-    def select_action(self,state):# to select which action to be taken
-        probs=F.softmax(self.model(Variable(state, volatile=True))*7)  #probs stand for finding probablities and softmax function is used to select action based on probablity, state is a torch tensor and we are converting it into torch variable, by using volatile=true we are specifying we dont want gradient along with graphs
-        # 7 is the temperature parameter , it is used to maximize the softmax function
-        action=probs.multinomial() #multinomial is used to randomly select the probablitiy values
-        return action.data[0,0] # it is a trick
+
     
     
-    def learn(self,batch_state,batch_next_state,batch_reward,batch_action):
-        outputa=self.model(batch_state)
+    def select_action(self, state):
+       probs = F.softmax(self.model(Variable(state, volatile = True))*100) # T=100;  #probs stand for finding probablities and softmax function is used to select action based on probablity, state is a torch tensor and we are converting it into torch variable, by using volatile=true we are specifying we dont want gradient along with graphs
+       # 7 is the temperature parameter , it is used to maximize the softmax function
+       action = probs.multinomial(num_samples=1)#multinomial is used to randomly select the probablitiy values
+       return action.data[0,0]# it is a trick
+    
+    def learn(self,batch_state,batch_next_state,batch_reward,batch_action): #batch_state is for current state , used for transitions
+        outputs=self.model(batch_state).gather(1,batch_action.unsqueeze[1]).squeeze(1) #we receive theoutput for all three action(0,1,2) but we want action that is chosen therefore we use gather func (1,batch_action ) chooses the best action always
+        #unsqueeze is used for fake dimaension ,earlier we used unsqueeze for batch_state therefore we also have to do it for batch_action to match the dimensions
+        next_outputs=self.model(batch_next_state).detach().max(1)[0]  #batch next state contains multiple next states detach functin is used to detach them and max function is applied to find max q-values , since we are finding max q-values wrt to action me do [1]
+        target=self.gamma * next_outputs + batch_reward
+        td_loss=F.smooth_l1_loss(outputs, target)
+        self.optimizer.zero_grad() #just write
+        td_loss.backward(retain_variables=True)
+        self.optimizer.step()
+        
+        
+    def update(self, reward, new_signal):
+        new_state = torch.Tensor(new_signal).float().unsqueeze(0)
+        self.memory.push((self.last_state, new_state, torch.LongTensor([int(self.last_action)]), torch.Tensor([self.last_reward])))
+        action = self.select_action(new_state)
+        if len(self.memory.memory) > 100:
+            batch_state, batch_next_state, batch_action, batch_reward = self.memory.sample(100)
+            self.learn(batch_state, batch_next_state, batch_reward, batch_action)
+        self.last_action = action
+        self.last_state = new_state
+        self.last_reward = reward
+        self.reward_window.append(reward)
+        if len(self.reward_window) > 1000:
+            del self.reward_window[0]
+        return action
+    
+    def score(self):
+        return sum(self.reward_window)/(len(self.reward_window)+1.)
+    
+    def save(self):
+        torch.save({'state_dict': self.model.state_dict(),
+                    'optimizer' : self.optimizer.state_dict(),
+                   }, 'last_brain.pth')
+    
+    def load(self):
+        if os.path.isfile('last_brain.pth'):
+            print("=> loading checkpoint... ")
+            checkpoint = torch.load('last_brain.pth')
+            self.model.load_state_dict(checkpoint['state_dict'])
+            self.optimizer.load_state_dict(checkpoint['optimizer'])
+            print("done !")
+        else:
+            print("no checkpoint found...")
