@@ -60,11 +60,16 @@ class Dqn():
 
     
     
+    # def select_action(self, state):
+    #    probs = F.softmax(self.model(Variable(state, volatile = True))*100) # T=100;  #probs stand for finding probablities and softmax function is used to select action based on probablity, state is a torch tensor and we are converting it into torch variable, by using volatile=true we are specifying we dont want gradient along with graphs
+    #    # 7 is the temperature parameter , it is used to maximize the softmax function
+    #    action = probs.multinomial(num_samples=1)#multinomial is used to randomly select the probablitiy values
+    #    return action.data[0,0]# it is a trick
+
     def select_action(self, state):
-       probs = F.softmax(self.model(Variable(state, volatile = True))*100) # T=100;  #probs stand for finding probablities and softmax function is used to select action based on probablity, state is a torch tensor and we are converting it into torch variable, by using volatile=true we are specifying we dont want gradient along with graphs
-       # 7 is the temperature parameter , it is used to maximize the softmax function
-       action = probs.multinomial(num_samples=1)#multinomial is used to randomly select the probablitiy values
-       return action.data[0,0]# it is a trick
+        probs = F.softmax(self.model(Variable(state, volatile = True))*100) # T=100
+        action = probs.multinomial(num_samples=1)
+        return action.data[0,0]
     
     def learn(self,batch_state,batch_next_state,batch_reward,batch_action): #batch_state is for current state , used for transitions
         outputs=self.model(batch_state).gather(1,batch_action.unsqueeze[1]).squeeze(1) #we receive theoutput for all three action(0,1,2) but we want action that is chosen therefore we use gather func (1,batch_action ) chooses the best action always
@@ -109,3 +114,5 @@ class Dqn():
             print("done !")
         else:
             print("no checkpoint found...")
+
+
